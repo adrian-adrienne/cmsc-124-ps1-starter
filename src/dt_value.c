@@ -100,9 +100,12 @@ dt_status dt_value_as_int(dt_value v, long long *out)
        dt_value_as_int(dt_value_int(42), &out)  -> DT_OK, out = 42
        dt_value_as_int(dt_value_str(s), &out)   -> DT_ERR_TAG, out untouched
        cases/normal/union_readers.case, cases/tag/as_int_on_string.case */
-    (void)v;
-    (void)out;
-    return DT_ERR_TAG;
+    // Check the tag first: v.as.integer is only valid when the tag is DT_INT.
+    if (v.tag != DT_INT) {          
+        return DT_ERR_TAG;          /* *out is preserved */
+    }
+    *out = v.as.integer;            /*member access is valid because the tag is DT_INT */
+    return DT_OK;
 }
 
 /*
@@ -114,9 +117,13 @@ dt_status dt_value_as_enum(dt_value v, int *out)
        dt_value_as_enum(dt_value_enum(2), &out)  -> DT_OK, out = 2 for BLUE
        dt_value_as_enum(dt_value_nil(), &out)    -> DT_ERR_TAG, out untouched
        cases/normal/union_readers.case, cases/tag/as_enum_on_nil.case */
-    (void)v;
-    (void)out;
-    return DT_ERR_TAG;
+    // Similar to dt_value_as_int
+    // This validates DT_ENUM and writes its ordinal to *out.
+    if (v.tag != DT_ENUM) {
+        return DT_ERR_TAG;
+    }
+    *out = v.as.ordinal;
+    return DT_OK;
 }
 
 /*
@@ -129,7 +136,10 @@ dt_status dt_value_as_str(dt_value v, dt_str **out)
        dt_value_as_str(dt_value_int(42), &out) -> DT_ERR_TAG, *out untouched
        the tag check prevents the printer from reading 42 as an address
        cases/normal/union_readers.case, cases/tag/as_str_on_int.case */
-    (void)v;
-    (void)out;
-    return DT_ERR_TAG;
+    // Similar to dt_value_as_int
+    if (v.tag != DT_STR) {
+        return DT_ERR_TAG;
+    }
+    *out = v.as.string;
+    return DT_OK;
 }
