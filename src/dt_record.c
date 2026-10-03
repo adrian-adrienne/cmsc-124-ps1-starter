@@ -134,12 +134,11 @@ dt_status dt_record_get(const dt_record *r, const char *field, dt_value *out)
         if (strcmp(r->names[i], field) == 0){ //strcmp returns 0 if identical
             *out = r->values[i];
             return DT_OK;
-        }
-        else{
-            return DT_ERR_FIELD;
-        }
+         }
      }
+      return DT_ERR_FIELD;
 }
+
 
 /*
  * dt_record_set replaces the value of field with v.
@@ -160,8 +159,6 @@ dt_status dt_record_set(dt_record *r, const char *field, dt_value v)
             r->values[i] = v;
             return DT_OK;
         }
-        else{
-            return DT_ERR_FIELD;
-        }
      }
+      return DT_ERR_FIELD;
 }
