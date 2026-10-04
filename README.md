@@ -10,7 +10,7 @@ toolchains, and local verification details for the work that the manual defines.
 Replace the two entries below. An assigned trio adds one entry.
 
 - Adrian Benjamin Moser (`@AdrianMoser1`)
-- Full Name (`@github-username`)
+- Adrienne Nicole Tipon (`@strg-ze`)
 
 ## Files You May Change
 

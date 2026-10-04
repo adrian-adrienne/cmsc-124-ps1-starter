@@ -106,7 +106,20 @@ void dt_map_free(dt_map *m)
        a map holding a string value  -> the nodes and keys go, the string stays
        dt_map_free(NULL)             -> returns, having done nothing
        cases/cleanup/map_churn.case */
-    (void)m;
+       
+       if (m==NULL){ // just return, do nothing
+        return; 
+       }
+
+       map_entry *e = m->head;
+       while (e != NULL){
+        map_entry *next = e->order_next; //assign next pointer
+        free(e->key); //free the copied key
+        free(e); //free the entry
+        e = next; //move to next
+       }
+       free(m->buckets);
+       free(m);
 }
 
 /*
@@ -120,8 +133,7 @@ size_t dt_map_len(const dt_map *m)
        after put beta again:          dt_map_len(m) -> 3, still
        after del alpha:               dt_map_len(m) -> 2
        cases/normal/map_basics.case */
-    (void)m;
-    return 0;
+    return m->count;
 }
 
 /*
@@ -140,10 +152,53 @@ dt_status dt_map_put(dt_map *m, const char *key, dt_value v)
        put "beta" -> 22 on that map       -> DT_OK, same position, new value
        an allocation failure              -> DT_ERR_CAPACITY, map unchanged
        cases/normal/map_basics.case */
-    (void)m;
-    (void)key;
-    (void)v;
-    return DT_ERR_CAPACITY;
+
+    map_entry *e = find_entry(m,key); //check if key exists
+
+    if (e!=NULL){ //if key exists, replace value
+        e->value = v;
+        return DT_OK;
+    }
+
+    e = malloc(sizeof *e); //allocate memory for new entry
+    if (e==NULL){
+        return DT_ERR_CAPACITY;
+    }
+
+    //copy the key string into newly allocated memory
+    size_t len = strlen(key) + 1; //the +1 includes the null terminator
+    char *copy = malloc(len); //allocate memory for the key string
+    if (copy == NULL){ //free entry so nothing leaks
+        free(e);
+        return DT_ERR_CAPACITY;
+    }
+
+    //copy the key and assign values
+    memcpy(copy, key, len);
+    e->key = copy; 
+    e->value = v;
+
+    //insert into hash bucket chain
+    size_t bucket = bucket_of(m, key);
+    e->chain_next = m->buckets[bucket]; 
+    m->buckets[bucket] = e; //insert e at the front of bucket chain
+
+    //insert into insertion order list
+    e->order_next = NULL; 
+    e->order_prev = m->tail;
+
+    //if list is empty, set head = e
+    //if not, link old tail forward
+    if (m->tail != NULL) {
+        m->tail->order_next = e; 
+    }
+    else{
+        m->head = e; 
+    }
+    m->tail = e; //assign e as the tail
+
+    m->count++; //update element count
+    return DT_OK;
 }
 
 /*
