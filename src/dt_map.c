@@ -20,10 +20,62 @@
 #include <stdlib.h>
 #include <string.h>
 
+#define MAP_INITIAL_BUCKETS 16                  // provides the optimal balance of bitwise optimization and low memory overhead.
+
+typedef struct map_entry {
+    char             *key;          // our own copy of the caller's key
+    dt_value          value;
+    struct map_entry *chain_next;   // next entry in the same bucket 
+    struct map_entry *order_prev;   // insertion-order list (doubly linked)
+    struct map_entry *order_next;
+} map_entry;
+
 struct dt_map {
-    int placeholder; /* TODO: Add the buckets and insertion-order data. */
+    map_entry **buckets;             //chains pointer
+    size_t      nbuckets;
+    size_t      count;
+    map_entry  *head;               
+    map_entry  *tail;               
 };
 
+static unsigned long long fnv1a(const char *key) //from instructions
+{
+    unsigned long long h = 14695981039346656037ULL;
+    for (const unsigned char *p = (const unsigned char *)key; *p != '\0'; p++) {
+        h ^= (unsigned long long)*p;
+        h *= 1099511628211ULL;
+    }
+    return h;
+}
+
+static size_t bucket_of(const dt_map *m, const char *key)           // returns the bucket index for a key. The caller must not pass NULL.
+{
+    return (size_t)(fnv1a(key) % (unsigned long long)m->nbuckets);
+}
+
+static map_entry *find_entry(const dt_map *m, const char *key)   // Walk one chain, comparing stored keys. NULL means absence
+{
+    for (map_entry *e = m->buckets[bucket_of(m, key)]; e != NULL; e = e->chain_next) {
+        if (strcmp(e->key, key) == 0) return e;
+    }
+    return NULL;
+}
+
+static void grow(dt_map *m)
+{
+    if (m->nbuckets > SIZE_MAX / 2 / sizeof(map_entry *)) return;
+    size_t newn = m->nbuckets * 2;
+    map_entry **nb = calloc(newn, sizeof *nb);
+    if (!nb) return;
+    free(m->buckets);
+    m->buckets = nb;
+    m->nbuckets = newn;
+    for (map_entry *e = m->head; e != NULL; e = e->order_next) {
+        size_t b = bucket_of(m, e->key);
+        e->chain_next = m->buckets[b];
+        m->buckets[b] = e;
+    }
+}
 /*
  * dt_map_new builds an empty map. It returns NULL after an allocation failure.
  */
@@ -32,7 +84,15 @@ dt_map *dt_map_new(void)
     /* TODO: Return an allocated empty map. Return NULL after an allocation failure.
        dt_map_new()  -> a map whose dt_map_len is 0
        cases/normal/map_basics.case */
-    return NULL;
+    dt_map *m = malloc(sizeof *m);             
+    if (!m){return NULL;};  
+    m->buckets = calloc(MAP_INITIAL_BUCKETS, sizeof *m->buckets);       // allocate the bucket array and initialize it to NULL
+    if (!m->buckets) { free(m); return NULL; }                          // free the map structure if m is
+
+    m->nbuckets = MAP_INITIAL_BUCKETS;
+    m->count = 0;
+    m->head = m->tail = NULL;
+    return m;
 }
 
 /*
