@@ -214,10 +214,10 @@ dt_status dt_map_get(const dt_map *m, const char *key, dt_value *out)
          dt_map_get(m, "beta", &out)   -> DT_OK, *out is the integer 22
          dt_map_get(m, "ghost", &out)  -> DT_ERR_KEY, *out untouched
        cases/normal/map_basics.case, cases/boundary/map_missing_key.case */
-    (void)m;
-    (void)key;
-    (void)out;
-    return DT_ERR_KEY;
+    map_entry *e = find_entry(m, key);
+    if (!e) return DT_ERR_KEY;                      // absent is not the same answer as nil; nil can be stored in the map
+    *out = e->value;
+    return DT_OK;
 }
 
 /*
@@ -233,9 +233,40 @@ dt_status dt_map_remove(dt_map *m, const char *key)
          dt_map_remove(m, "ghost")  -> DT_ERR_KEY, nothing changes
        reinserting "alpha" appends it after "gamma"
        cases/normal/map_basics.case, cases/boundary/map_remove_missing_key.case */
-    (void)m;
-    (void)key;
-    return DT_ERR_KEY;
+    map_entry *e = find_entry(m, key);
+    if (!e) return DT_ERR_KEY;
+
+    // Remove from hash bucket chain
+    size_t bucket = bucket_of(m, key);          
+    if (m->buckets[bucket] == e) {                      
+        m->buckets[bucket] = e->chain_next;         //mark the next entry in the chain as the new head of the bucket
+    } else {
+        map_entry *prev = m->buckets[bucket];           
+        while (prev && prev->chain_next != e) {         //iterate through the bucket chain to find the entry before e
+            prev = prev->chain_next;
+        }
+        if (prev) {
+            prev->chain_next = e->chain_next;           //entry e is removed from the chain by linking the previous entry to the next entry
+        }
+    }
+
+    // Remove from insertion order list
+    if (e->order_prev) {                    //if e has a previous entry in the insertion order list, link that entry to e's next entry
+        e->order_prev->order_next = e->order_next;
+    } else {
+        m->head = e->order_next;   
+    }
+    if (e->order_next) {                   //if e has a next entry in the insertion order list, link that entry to e's previous entry
+        e->order_next->order_prev = e->order_prev;
+    } else {
+        m->tail = e->order_prev;
+    }
+
+    // Release the copied key and free the entry
+    free((char *)e->key);
+    free(e);
+    m->count--;
+    return DT_OK;
 }
 
 /*
@@ -251,8 +282,13 @@ dt_status dt_map_key_at(const dt_map *m, size_t index, const char **out)
          dt_map_key_at(m, 0, &out)  -> DT_OK, *out = "alpha"
          dt_map_key_at(m, 3, &out)  -> DT_ERR_RANGE, *out untouched
        cases/normal/map_basics.case */
-    (void)m;
-    (void)index;
-    (void)out;
-    return DT_ERR_RANGE;
+    if (index >= m->count) {        //Overshooting
+        return DT_ERR_RANGE;
+    }
+    map_entry *e = m->head;         
+    for (size_t i = 0; i < index; i++) {            // iterate through the list until reaching the desired index
+        e = e->order_next;
+    }
+    *out = e->key;
+    return DT_OK;
 }
