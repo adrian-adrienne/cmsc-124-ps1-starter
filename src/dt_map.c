@@ -61,21 +61,6 @@ static map_entry *find_entry(const dt_map *m, const char *key)   // Walk one cha
     return NULL;
 }
 
-static void grow(dt_map *m)
-{
-    if (m->nbuckets > SIZE_MAX / 2 / sizeof(map_entry *)) return;
-    size_t newn = m->nbuckets * 2;
-    map_entry **nb = calloc(newn, sizeof *nb);
-    if (!nb) return;
-    free(m->buckets);
-    m->buckets = nb;
-    m->nbuckets = newn;
-    for (map_entry *e = m->head; e != NULL; e = e->order_next) {
-        size_t b = bucket_of(m, e->key);
-        e->chain_next = m->buckets[b];
-        m->buckets[b] = e;
-    }
-}
 /*
  * dt_map_new builds an empty map. It returns NULL after an allocation failure.
  */
